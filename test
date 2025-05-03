@@ -1,0 +1,78 @@
+import cv2
+import mediapipe as mp
+import numpy as np
+
+def pad_image(img, pad_size):
+    return np.pad(img, ((pad_size, pad_size), (pad_size, pad_size)), mode='constant', constant_values=0)
+
+def apply_filter(f_transform, filter_type='low', radius=30):
+    rows, cols = f_transform.shape
+    crow, ccol = rows // 2, cols // 2
+
+    mask = np.zeros((rows, cols), np.uint8)
+
+    if filter_type == 'low':
+        cv2.circle(mask, (ccol, crow), radius, 1, thickness=-1)
+    elif filter_type == 'high':
+        mask[:] = 1
+        cv2.circle(mask, (ccol, crow), radius, 0, thickness=-1)
+
+    return f_transform * mask
+
+# MediaPipe setup
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1)
+mp_draw = mp.solutions.drawing_utils
+
+# Webcam
+cap = cv2.VideoCapture(0)
+
+while True:
+    success, img = cap.read()
+    if not success:
+        break
+
+    # Step 1: Convert to grayscale
+    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # Step 2: Resize to 150x140
+    resized = cv2.resize(img_gray, (150, 140))
+
+    # Step 3: Pad image
+    pad_size = 20
+    padded = pad_image(resized, pad_size)
+
+    # Step 4: Fourier Transform
+    f_transform = np.fft.fft2(padded)
+    f_shift = np.fft.fftshift(f_transform)
+
+    # Step 5: Construct filter (Low-pass by default)
+    filtered_freq = apply_filter(f_shift, filter_type='low', radius=30)
+
+    # Step 6: Apply filter and inverse FFT
+    f_ishift = np.fft.ifftshift(filtered_freq)
+    img_back = np.fft.ifft2(f_ishift)
+    img_back = np.real(img_back)
+
+    # Step 7: Crop back to original resized size (remove padding)
+    cropped = img_back[pad_size:-pad_size, pad_size:-pad_size].astype(np.uint8)
+
+    # Convert cropped image back to 3-channel for hand landmark drawing
+    display_img = cv2.cvtColor(cropped, cv2.COLOR_GRAY2BGR)
+
+    # Hand detection on original frame (optional)
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    results = hands.process(img_rgb)
+
+    if results.multi_hand_landmarks:
+        for hand_landmarks in results.multi_hand_landmarks:
+            mp_draw.draw_landmarks(display_img, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+
+    # Display final processed image
+    cv2.imshow("Processed Hand Gesture", display_img)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
