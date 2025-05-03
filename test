@@ -19,12 +19,10 @@ def apply_filter(f_transform, filter_type='low', radius=30):
 
     return f_transform * mask
 
-# MediaPipe setup
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1)
 mp_draw = mp.solutions.drawing_utils
 
-# Webcam
 cap = cv2.VideoCapture(0)
 
 while True:
@@ -32,35 +30,31 @@ while True:
     if not success:
         break
 
-    # Step 1: Convert to grayscale
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # Step 2: Resize to 150x140
     resized = cv2.resize(img_gray, (150, 140))
 
-    # Step 3: Pad image
     pad_size = 20
     padded = pad_image(resized, pad_size)
 
-    # Step 4: Fourier Transform
     f_transform = np.fft.fft2(padded)
     f_shift = np.fft.fftshift(f_transform)
+    magnitude_spectrum = 20 * np.log(np.abs(f_shift) + 1)  # avoid log(0)
+    magnitude_spectrum = np.uint8(np.clip(magnitude_spectrum, 0, 255))
+    cv2.imshow("FFT Magnitude", magnitude_spectrum)
 
-    # Step 5: Construct filter (Low-pass by default)
     filtered_freq = apply_filter(f_shift, filter_type='low', radius=30)
 
-    # Step 6: Apply filter and inverse FFT
     f_ishift = np.fft.ifftshift(filtered_freq)
     img_back = np.fft.ifft2(f_ishift)
     img_back = np.real(img_back)
+    filtered_magnitude = 20 * np.log(np.abs(filtered_freq) + 1)
+    filtered_magnitude = np.uint8(np.clip(filtered_magnitude, 0, 255))
+    cv2.imshow("Filtered FFT", filtered_magnitude)
 
-    # Step 7: Crop back to original resized size (remove padding)
     cropped = img_back[pad_size:-pad_size, pad_size:-pad_size].astype(np.uint8)
 
-    # Convert cropped image back to 3-channel for hand landmark drawing
     display_img = cv2.cvtColor(cropped, cv2.COLOR_GRAY2BGR)
 
-    # Hand detection on original frame (optional)
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     results = hands.process(img_rgb)
 
@@ -68,7 +62,6 @@ while True:
         for hand_landmarks in results.multi_hand_landmarks:
             mp_draw.draw_landmarks(display_img, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
-    # Display final processed image
     cv2.imshow("Processed Hand Gesture", display_img)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
