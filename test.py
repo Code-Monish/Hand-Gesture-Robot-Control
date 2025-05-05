@@ -2,22 +2,23 @@ import cv2
 import numpy as np
 import pickle
 
-# === Step 1: Load Saved Fourier Templates ===
+# === Load Fourier Templates ===
 with open("gesture_templates_from_dataset.pkl", "rb") as f:
-    gesture_templates = pickle.load(f)  # {label: descriptor}
+    gesture_templates = pickle.load(f)
 
-# === Step 2: Image Processing and Fourier Functions ===
+for key in gesture_templates:
+    gesture_templates[key] = np.abs(gesture_templates[key])
 
+# === Gray-Based Mask Function ===
 def get_hand_mask(frame):
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    lower_skin = np.array([0, 20, 70], dtype=np.uint8)
-    upper_skin = np.array([20, 255, 255], dtype=np.uint8)
-    mask = cv2.inRange(hsv, lower_skin, upper_skin)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    _, mask = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY_INV)  # you may need to tune this value
     kernel = np.ones((3, 3), np.uint8)
     mask = cv2.dilate(mask, kernel, iterations=2)
     mask = cv2.GaussianBlur(mask, (5, 5), 100)
     return mask
 
+# === Contour and Descriptor Functions ===
 def get_largest_contour(mask):
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     if contours and len(contours) > 0:
@@ -41,14 +42,14 @@ def descriptor_distance(desc1, desc2):
         return np.inf
     return np.linalg.norm(desc1 - desc2)
 
-# === Step 3: Start Webcam for Live Recognition ===
-
+# === Webcam Loop ===
 cap = cv2.VideoCapture(0)
 print("[INFO] Press 'q' to quit...")
 
 while True:
     ret, frame = cap.read()
     if not ret:
+        print("[ERROR] Camera not detected.")
         break
 
     frame = cv2.flip(frame, 1)
@@ -62,13 +63,29 @@ while True:
 
         if current_descriptor is not None:
             min_dist = float('inf')
+            best_label = "none"
+
             for label, template in gesture_templates.items():
+                if len(template) != len(current_descriptor):
+                    print(f"[WARNING] Template size mismatch for {label}")
+                    continue
+
                 dist = descriptor_distance(current_descriptor, template)
+                print(f"[DEBUG] Distance to {label}: {dist:.4f}")
                 if dist < min_dist:
                     min_dist = dist
-                    predicted_label = label
+                    best_label = label
 
-    # === Step 4: Display Output ===
+            if min_dist < 0.5:
+                predicted_label = best_label
+            else:
+                predicted_label = "Uncertain"
+        else:
+            print("[DEBUG] Descriptor computation failed")
+    else:
+        print("[DEBUG] No valid contour found")
+
+    # Display
     cv2.putText(frame, f"Gesture: {predicted_label}", (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
@@ -80,3 +97,4 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
+
