@@ -2,8 +2,8 @@ import os
 import cv2
 
 # Use raw string (prefix with r) to avoid backslash errors
-input_folder = r"C:\Users\Hemanth\Desktop\Hand gesture\data\data\train\thumbs"
-output_folder = r"C:\Users\Hemanth\Desktop\Hand gesture\data\data\train_padded\thumbs"
+input_folder = r"data\data\train\thumbs"
+output_folder = r"data\data\train_padded\thumbs"
 pad_width = 10  # Change as needed
 
 # Create output folder if it doesn't exist

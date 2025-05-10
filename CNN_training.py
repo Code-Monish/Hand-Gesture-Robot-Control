@@ -13,7 +13,7 @@ EPOCHS = 20
 NUM_CLASSES = 8  # Based on your gesture classes
 
 # Define paths
-DATASET_DIR = r'C:\Users\Hemanth\Desktop\Hand gesture\data\train'  # Should have subfolders for each gesture class
+DATASET_DIR = r'data\train'  # Should have subfolders for each gesture class
 
 # Prepare the dataset
 datagen = ImageDataGenerator(validation_split=0.2, rescale=1./255)

@@ -34,7 +34,7 @@ def fourier_descriptor(contour, num_descriptors=32):
 # === Step 2: Process All Images ===
 
 # Define paths for your dataset
-dataset_path = r'C:\Users\Hemanth\Desktop\Hand gesture\data\test'
+dataset_path = r'data\test'
 gesture_labels = ['thumbs', 'fist', 'peace', 'okay', 'rad', 'five', 'straight', 'none']
 template_data = {}
 
