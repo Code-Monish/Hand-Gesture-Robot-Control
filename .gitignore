@@ -1,0 +1,5 @@
+# Ignore virtual environments
+venv12/
+.venv12/
+ENV/
+env/
