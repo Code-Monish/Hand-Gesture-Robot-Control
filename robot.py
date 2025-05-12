@@ -59,15 +59,6 @@ revolute_joint_2 = 1  # Second revolute joint
 prismatic_joint = 2   # Prismatic joint
 step_size = 0.1       # Step size for joint adjustments
 
-for joint_id in joint_ids:
-    print(f"Rotating Joint {joint_id} 360 degrees...")
-    for angle in np.linspace(0, 2 * np.pi, num=100):  # Incrementally rotate from 0 to 2π radians
-        p.setJointMotorControl2(robot_id, joint_id, p.POSITION_CONTROL, targetPosition=angle)
-        p.stepSimulation()
-        time.sleep(0.01)  # Small delay for smooth simulation
-print("Mock rotation complete!")
-
-
 while True:
     # Read the camera frame
     ret, frame = cap.read()
