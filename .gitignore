@@ -1,5 +1,11 @@
+# Ignore 3D model folder
+robot_assembly_description/
+
 # Ignore virtual environments
 venv12/
 .venv12/
 ENV/
 env/
+
+# Ignore pickle files
+*.pkl

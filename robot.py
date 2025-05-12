@@ -1,6 +1,9 @@
 import pybullet as p
 import pybullet_data
 import time
+from gesture_recognition import GestureRecognizer  # Import the gesture recognition module
+import cv2
+import numpy as np
 
 # Connect to PyBullet GUI
 p.connect(p.GUI)
@@ -26,18 +29,108 @@ for i in range(num_joints):
 
 sliders = []
 joint_ids = []
+last_positions = [0.0] * num_joints
 
 for i in range(p.getNumJoints(robot_id)):
     joint_info = p.getJointInfo(robot_id, i)
-    joint_name = joint_info[1].decode('utf-8')
-    sliders.append(p.addUserDebugParameter(joint_name, -3.14, 3.14, 0))
+    joint_name = "Link" + joint_info[1].decode('utf-8')  # Decode the joint name to a string
+    sliders.append(p.addUserDebugParameter(joint_name, -3.14, 3.14, 0))  # Pass joint_name as a string
     joint_ids.append(i)
-
-# Loop to keep simulation running
-while True:
-    for i, slider in enumerate(sliders):
-        target_pos = p.readUserDebugParameter(slider)
-        p.setJointMotorControl2(robot_id, joint_ids[i], p.POSITION_CONTROL, targetPosition=target_pos)
     
+print(f"Joint IDs: {joint_ids}")
+print(f"Sliders: {sliders}")
+
+time.sleep(5)  # Allow time for the GUI to initialize
+# Initialize GestureRecognizer
+gesture_recognizer = GestureRecognizer()
+
+# Start capturing live camera feed
+cap = cv2.VideoCapture(0)
+
+if not cap.isOpened():
+    print("Error: Could not open camera.")
+    exit()
+
+print("Press 'q' to quit.")
+
+# Initialize joint indices and step size
+revolute_joint_1 = 0  # First revolute joint
+revolute_joint_2 = 1  # Second revolute joint
+prismatic_joint = 2   # Prismatic joint
+step_size = 0.1       # Step size for joint adjustments
+
+for joint_id in joint_ids:
+    print(f"Rotating Joint {joint_id} 360 degrees...")
+    for angle in np.linspace(0, 2 * np.pi, num=100):  # Incrementally rotate from 0 to 2π radians
+        p.setJointMotorControl2(robot_id, joint_id, p.POSITION_CONTROL, targetPosition=angle)
+        p.stepSimulation()
+        time.sleep(0.01)  # Small delay for smooth simulation
+print("Mock rotation complete!")
+
+
+while True:
+    # Read the camera frame
+    ret, frame = cap.read()
+    if not ret:
+        print("Error: Could not read frame.")
+        break
+
+    # Flip the frame horizontally for a mirror effect
+    frame = cv2.flip(frame, 1)
+
+    # Detect gesture
+    gesture = gesture_recognizer.detect_gesture(frame)
+    print(f"Detected Gesture: {gesture}")  # Debug print for detected gesture
+
+    # Perform actions based on the detected gesture
+    if gesture == "Index Up":
+        # Increase the value of the first revolute joint
+        current_value = last_positions[revolute_joint_1]
+        new_value = current_value + step_size
+        new_value = min(new_value, 3.14)  # Ensure within valid range
+        print(f"Revolute Joint 1 increased to {new_value}")
+        p.setJointMotorControl2(robot_id, joint_ids[revolute_joint_1], p.POSITION_CONTROL, targetPosition=new_value)
+        last_positions[revolute_joint_1] = new_value  # Update last known position
+    elif gesture == "Index Down":
+        # Decrease the value of the second revolute joint
+        current_value = last_positions[revolute_joint_2]
+        new_value = current_value - step_size
+        new_value = max(new_value, -3.14)  # Ensure within valid range
+        print(f"Revolute Joint 2 decreased to {new_value}")
+        p.setJointMotorControl2(robot_id, joint_ids[revolute_joint_2], p.POSITION_CONTROL, targetPosition=new_value)
+        last_positions[revolute_joint_2] = new_value  # Update last known position
+    elif gesture == "Open Palm":
+        # Adjust the prismatic joint
+        current_value = last_positions[prismatic_joint]
+        new_value = current_value + step_size
+        new_value = max(min(new_value, 1.0), -1.0)  # Ensure within valid range
+        print(f"Prismatic Joint adjusted to {new_value}")
+        p.setJointMotorControl2(robot_id, joint_ids[prismatic_joint], p.POSITION_CONTROL, targetPosition=new_value)
+        last_positions[prismatic_joint] = new_value  # Update last known position
+    else:
+        # No gesture detected, maintain the last known positions
+        for i in range(num_joints):
+            p.setJointMotorControl2(robot_id, joint_ids[i], p.POSITION_CONTROL, targetPosition=last_positions[i])
+
+    # Log joint angles
+    for i in range(num_joints):
+        joint_state = p.getJointState(robot_id, i)
+        joint_angle = joint_state[0]  # Joint position
+        print(f"Joint {i}: Current Angle = {joint_angle:.2f} radians")
+
+    # Display the frame
+    cv2.putText(frame, f"Gesture: {gesture}", (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    cv2.imshow("Robot Control", frame)
+
+    # Step the simulation
     p.stepSimulation()
+
+    # Break the loop if 'q' is pressed
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release the camera and close all OpenCV windows
+cap.release()
+cv2.destroyAllWindows()
 
