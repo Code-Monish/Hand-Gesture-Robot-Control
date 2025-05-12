@@ -11,30 +11,34 @@ class GestureRecognizer:
     
 
     def classify_gesture(self, landmarks, frame_width, frame_height):
-        """
-        Classify gestures based on key landmarks.
-        :param landmarks: List of 21 hand landmarks.
-        :param frame_width: Width of the video frame.
-        :param frame_height: Height of the video frame.
-        :return: Gesture name as a string.
-        """
         wrist = landmarks[0]
         index_tip = landmarks[8]
         thumb_tip = landmarks[4]
         pinky_tip = landmarks[20]
 
         # Gesture: Index Up
-        if index_tip[1] < wrist[1]:  # Index finger above wrist
+        if index_tip[1] < wrist[1]:
             return "Index Up"
 
         # Gesture: Index Down
-        elif index_tip[1] > wrist[1]:  # Index finger below wrist
+        elif index_tip[1] > wrist[1]:
             return "Index Down"
 
+        # Gesture: Thumb Right
+        elif thumb_tip[0] > wrist[0]:
+            return "Thumb Right"
+    
+        # Gesture: Thumb Left
+        elif thumb_tip[0] < wrist[0]:
+            return "Thumb Left"
+
         # Gesture: Open Palm
-        thumb_pinky_distance = np.linalg.norm(np.array(thumb_tip[:2]) - np.array(pinky_tip[:2]))
-        if thumb_pinky_distance > 0.2 * frame_width:  # Adjust threshold as needed
+        elif abs(thumb_tip[0] - pinky_tip[0]) > 0.2 * frame_width:
             return "Open Palm"
+
+        # Gesture: Fist
+        elif abs(thumb_tip[0] - pinky_tip[0]) < 0.1 * frame_width:
+            return "Fist"
 
         return None
 

@@ -84,34 +84,57 @@ while True:
 
     # Perform actions based on the detected gesture
     if gesture == "Index Up":
-        # Increase the value of the first revolute joint
-        current_value = last_positions[revolute_joint_1]
-        new_value = current_value + step_size
-        new_value = min(new_value, 3.14)  # Ensure within valid range
-        print(f"Revolute Joint 1 increased to {new_value}")
-        p.setJointMotorControl2(robot_id, joint_ids[revolute_joint_1], p.POSITION_CONTROL, targetPosition=new_value)
-        last_positions[revolute_joint_1] = new_value  # Update last known position
-    elif gesture == "Index Down":
-        # Decrease the value of the second revolute joint
-        current_value = last_positions[revolute_joint_2]
+        # Move the prismatic joint up
+        current_value = last_positions[prismatic_joint]
         new_value = current_value - step_size
-        new_value = max(new_value, -3.14)  # Ensure within valid range
-        print(f"Revolute Joint 2 decreased to {new_value}")
-        p.setJointMotorControl2(robot_id, joint_ids[revolute_joint_2], p.POSITION_CONTROL, targetPosition=new_value)
-        last_positions[revolute_joint_2] = new_value  # Update last known position
-    elif gesture == "Open Palm":
-        # Adjust the prismatic joint
+        new_value = max(min(new_value, 1.0), -1.0)  # Ensure within valid range
+        print(f"Prismatic Joint moved up to {new_value}")
+        p.setJointMotorControl2(robot_id, joint_ids[prismatic_joint], p.POSITION_CONTROL, targetPosition=new_value)
+        last_positions[prismatic_joint] = new_value  # Update last known position
+    elif gesture == "Index Down":
+        # Move the prismatic joint down
         current_value = last_positions[prismatic_joint]
         new_value = current_value + step_size
         new_value = max(min(new_value, 1.0), -1.0)  # Ensure within valid range
-        print(f"Prismatic Joint adjusted to {new_value}")
+        print(f"Prismatic Joint moved down to {new_value}")
         p.setJointMotorControl2(robot_id, joint_ids[prismatic_joint], p.POSITION_CONTROL, targetPosition=new_value)
         last_positions[prismatic_joint] = new_value  # Update last known position
+    elif gesture == "Thumb Right":
+        # Rotate the first revolute joint forward
+        current_value = last_positions[revolute_joint_1]
+        new_value = current_value + step_size
+        new_value = min(new_value, 3.14)  # Ensure within valid range
+        print(f"Revolute Joint 1 rotated forward to {new_value}")
+        p.setJointMotorControl2(robot_id, joint_ids[revolute_joint_1], p.POSITION_CONTROL, targetPosition=new_value)
+        last_positions[revolute_joint_1] = new_value  # Update last known position
+    elif gesture == "Thumb Left":
+        # Rotate the first revolute joint backward
+        current_value = last_positions[revolute_joint_1]
+        new_value = current_value - step_size
+        new_value = max(new_value, -3.14)  # Ensure within valid range
+        print(f"Revolute Joint 1 rotated backward to {new_value}")
+        p.setJointMotorControl2(robot_id, joint_ids[revolute_joint_1], p.POSITION_CONTROL, targetPosition=new_value)
+        last_positions[revolute_joint_1] = new_value  # Update last known position
+    elif gesture == "Open Palm":
+        # Rotate the second revolute joint forward
+        current_value = last_positions[revolute_joint_2]
+        new_value = current_value + step_size
+        new_value = min(new_value, 3.14)  # Ensure within valid range
+        print(f"Revolute Joint 2 rotated forward to {new_value}")
+        p.setJointMotorControl2(robot_id, joint_ids[revolute_joint_2], p.POSITION_CONTROL, targetPosition=new_value)
+        last_positions[revolute_joint_2] = new_value  # Update last known position
+    elif gesture == "Fist":
+        # Rotate the second revolute joint backward
+        current_value = last_positions[revolute_joint_2]
+        new_value = current_value - step_size
+        new_value = max(new_value, -3.14)  # Ensure within valid range
+        print(f"Revolute Joint 2 rotated backward to {new_value}")
+        p.setJointMotorControl2(robot_id, joint_ids[revolute_joint_2], p.POSITION_CONTROL, targetPosition=new_value)
+        last_positions[revolute_joint_2] = new_value  # Update last known position
     else:
         # No gesture detected, maintain the last known positions
         for i in range(num_joints):
             p.setJointMotorControl2(robot_id, joint_ids[i], p.POSITION_CONTROL, targetPosition=last_positions[i])
-
     # Log joint angles
     for i in range(num_joints):
         joint_state = p.getJointState(robot_id, i)
@@ -130,7 +153,7 @@ while True:
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# Release the camera and close all OpenCV windows
+# Release the camera and close all OpenCV windowsz
 cap.release()
 cv2.destroyAllWindows()
 
