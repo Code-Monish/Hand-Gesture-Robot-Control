@@ -82,24 +82,24 @@ while True:
     gesture = gesture_recognizer.detect_gesture(frame)
     print(f"Detected Gesture: {gesture}")  # Debug print for detected gesture
 
-    # Perform actions based on the detected gesture
-    if gesture == "Index Up":
+    # Map gestures to actions
+    if gesture == "Index_Up":  # Replace with the actual gesture name from the model
         # Move the prismatic joint up
         current_value = last_positions[prismatic_joint]
-        new_value = current_value - step_size
+        new_value = current_value + step_size
         new_value = max(min(new_value, 1.0), -1.0)  # Ensure within valid range
         print(f"Prismatic Joint moved up to {new_value}")
         p.setJointMotorControl2(robot_id, joint_ids[prismatic_joint], p.POSITION_CONTROL, targetPosition=new_value)
         last_positions[prismatic_joint] = new_value  # Update last known position
-    elif gesture == "Index Down":
+    elif gesture == "Index_Down":  # Replace with the actual gesture name from the model
         # Move the prismatic joint down
         current_value = last_positions[prismatic_joint]
-        new_value = current_value + step_size
+        new_value = current_value - step_size
         new_value = max(min(new_value, 1.0), -1.0)  # Ensure within valid range
         print(f"Prismatic Joint moved down to {new_value}")
         p.setJointMotorControl2(robot_id, joint_ids[prismatic_joint], p.POSITION_CONTROL, targetPosition=new_value)
         last_positions[prismatic_joint] = new_value  # Update last known position
-    elif gesture == "Thumb Right":
+    elif gesture == "Thumb_Right":  # Replace with the actual gesture name from the model
         # Rotate the first revolute joint forward
         current_value = last_positions[revolute_joint_1]
         new_value = current_value + step_size
@@ -107,7 +107,7 @@ while True:
         print(f"Revolute Joint 1 rotated forward to {new_value}")
         p.setJointMotorControl2(robot_id, joint_ids[revolute_joint_1], p.POSITION_CONTROL, targetPosition=new_value)
         last_positions[revolute_joint_1] = new_value  # Update last known position
-    elif gesture == "Thumb Left":
+    elif gesture == "Thumb_Left":  # Replace with the actual gesture name from the model
         # Rotate the first revolute joint backward
         current_value = last_positions[revolute_joint_1]
         new_value = current_value - step_size
@@ -115,7 +115,7 @@ while True:
         print(f"Revolute Joint 1 rotated backward to {new_value}")
         p.setJointMotorControl2(robot_id, joint_ids[revolute_joint_1], p.POSITION_CONTROL, targetPosition=new_value)
         last_positions[revolute_joint_1] = new_value  # Update last known position
-    elif gesture == "Open Palm":
+    elif gesture == "Open_Palm":  # Replace with the actual gesture name from the model
         # Rotate the second revolute joint forward
         current_value = last_positions[revolute_joint_2]
         new_value = current_value + step_size
@@ -123,7 +123,7 @@ while True:
         print(f"Revolute Joint 2 rotated forward to {new_value}")
         p.setJointMotorControl2(robot_id, joint_ids[revolute_joint_2], p.POSITION_CONTROL, targetPosition=new_value)
         last_positions[revolute_joint_2] = new_value  # Update last known position
-    elif gesture == "Fist":
+    elif gesture == "Fist":  # Replace with the actual gesture name from the model
         # Rotate the second revolute joint backward
         current_value = last_positions[revolute_joint_2]
         new_value = current_value - step_size
@@ -135,16 +135,6 @@ while True:
         # No gesture detected, maintain the last known positions
         for i in range(num_joints):
             p.setJointMotorControl2(robot_id, joint_ids[i], p.POSITION_CONTROL, targetPosition=last_positions[i])
-    # Log joint angles
-    for i in range(num_joints):
-        joint_state = p.getJointState(robot_id, i)
-        joint_angle = joint_state[0]  # Joint position
-        print(f"Joint {i}: Current Angle = {joint_angle:.2f} radians")
-
-    # Display the frame
-    cv2.putText(frame, f"Gesture: {gesture}", (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-    cv2.imshow("Robot Control", frame)
 
     # Step the simulation
     p.stepSimulation()
