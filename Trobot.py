@@ -4,6 +4,9 @@ import time
 import cv2
 import mediapipe as mp
 import numpy as np
+import threading
+import os
+import queue
 
 # Initialize MediaPipe Hands
 mp_hands = mp.solutions.hands
@@ -20,6 +23,19 @@ p.setRealTimeSimulation(0)
 p.loadURDF("plane.urdf")
 robot_id = p.loadURDF("SCARA.urdf", basePosition=[0, 0, 0.1], useFixedBase=True)
 
+database_directory = "gesture_database"
+if not os.path.exists(database_directory):
+    os.makedirs(database_directory)
+    
+gesture_start_time = None
+last_detected_gesture = None
+save_interval = 2  # Save image after 5 seconds of consistent gesture
+
+# Shared variables for threading
+frame_to_save = None
+gesture_to_save = None
+save_lock = threading.Lock()
+
 # Get joint information
 num_joints = p.getNumJoints(robot_id)
 print(f"\nRobot has {num_joints} joints.\n")
@@ -33,18 +49,98 @@ for i in range(num_joints):
 
 # Start capturing live camera feed
 cap = cv2.VideoCapture(0)
-
 if not cap.isOpened():
     print("Error: Could not open camera.")
     exit()
-
-print("Press 'q' to quit.")
 
 # Joint indices and step size
 revolute_joint_1 = 0  # First revolute joint
 revolute_joint_2 = 1  # Second revolute joint
 prismatic_joint = 2   # Prismatic joint
 step_size = 0.1       # Step size for joint adjustments
+
+def apply_high_pass_fourier(image):
+    """
+    Apply a high-pass Fourier transform to highlight edges in the image.
+    """
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    dft = cv2.dft(np.float32(gray), flags=cv2.DFT_COMPLEX_OUTPUT)
+    dft_shift = np.fft.fftshift(dft)
+
+    # Create a high-pass mask
+    rows, cols = gray.shape
+    crow, ccol = rows // 2, cols // 2
+    mask = np.ones((rows, cols, 2), np.uint8)
+    r = 30  # Radius of the low-frequency region to block
+    mask[crow - r:crow + r, ccol - r:ccol + r] = 0
+
+    # Apply the mask and inverse DFT
+    fshift = dft_shift * mask
+    f_ishift = np.fft.ifftshift(fshift)
+    img_back = cv2.idft(f_ishift)
+    img_back = cv2.magnitude(img_back[:, :, 0], img_back[:, :, 1])
+
+    # Normalize the result for visualization
+    cv2.normalize(img_back, img_back, 0, 255, cv2.NORM_MINMAX)
+    return np.uint8(img_back)  # Return the processed image
+
+image_save_queue = queue.Queue()
+
+def save_gesture_image_from_queue():
+    """
+    Function to process and save images from the queue.
+    """
+    while not image_save_queue.empty():
+        # Get the frame and gesture from the queue
+        frame, gesture = image_save_queue.get()
+
+        # Create gesture-specific directory
+        gesture_dir = os.path.join(database_directory, gesture)
+        os.makedirs(gesture_dir, exist_ok=True)
+
+        # Apply high-pass Fourier transform
+        processed_image = apply_high_pass_fourier(frame)
+
+        # Save the image
+        timestamp = int(time.time())
+        filename = os.path.join(gesture_dir, f"{gesture}_{timestamp}.png")
+        cv2.imwrite(filename, processed_image)
+        print(f"Saved image: {filename}")
+
+        # Mark the task as done
+        image_save_queue.task_done()
+
+# def save_gesture_image():
+#     """
+#     Background thread function to save processed images.
+#     """
+#     global frame_to_save, gesture_to_save
+
+#     while True:
+#         if frame_to_save is not None and gesture_to_save is not None:
+#             with save_lock:
+#                 frame = frame_to_save
+#                 gesture = gesture_to_save
+#                 frame_to_save = None
+#                 gesture_to_save = None
+
+#             print(f"Saving image for gesture: {gesture}")
+
+#             # Create gesture-specific directory
+#             gesture_dir = os.path.join(database_directory, gesture)
+#             os.makedirs(gesture_dir, exist_ok=True)
+
+#             # Apply high-pass Fourier transform
+#             processed_image = apply_high_pass_fourier(frame)
+
+#             # Save the image
+#             timestamp = int(time.time())
+#             filename = os.path.join(gesture_dir, f"{gesture}_{timestamp}.png")
+#             cv2.imwrite(filename, processed_image)
+#             print(f"Saved image: {filename}")
+
+#         time.sleep(0.1)  # Avoid busy-waiting
+
 
 def get_finger_states(hand_landmarks):
     tips_ids = [4, 8, 12, 16, 20]
@@ -89,15 +185,9 @@ def detect_gesture(fingers, lm):
     else:
         return "Unknown"
 
-def move_joint(joint_id, current_value, delta, min_value, max_value):
-    """
-    Move a joint by a specified delta, clamping the value within a range.
-    """
-    new_value = current_value + delta
-    new_value = max(min(new_value, max_value), min_value)
-    p.setJointMotorControl2(robot_id, joint_id, p.POSITION_CONTROL, targetPosition=new_value)
-    return new_value
+# threading.Thread(target=save_gesture_image, daemon=True).start()
 
+# Main loop
 while True:
     # Read the camera frame
     ret, frame = cap.read()
@@ -164,9 +254,27 @@ while True:
                 new_value = max(new_value, -3.14)  # Ensure within valid range
                 p.setJointMotorControl2(robot_id, joint_ids[revolute_joint_2], p.POSITION_CONTROL, targetPosition=new_value)
                 last_positions[revolute_joint_2] = new_value
+
+            # Gesture consistency logic
+            if gesture == last_detected_gesture:
+                print("Gesture is consistent")
+                if gesture_start_time and time.time() - gesture_start_time >= save_interval:
+                    print("Saving gesture image...")
+                    # Add the frame and gesture to the queue
+                    image_save_queue.put((frame.copy(), gesture))
+                    gesture_start_time = None
+                else:
+                    print("Gesture consistency timer reset.")
+            else:
+                print(f"New gesture detected: {gesture}")
+                last_detected_gesture = gesture
+                gesture_start_time = time.time()
     else:
-        print("No hand detected")
-        
+        print("No hand detected.")
+
+    # Process the image save queue
+    save_gesture_image_from_queue()
+
     # Step the simulation
     p.stepSimulation()
 
